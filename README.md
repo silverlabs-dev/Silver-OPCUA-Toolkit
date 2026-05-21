@@ -64,40 +64,4 @@ Built with a modern full-stack architecture using Python and React.
 
 ## Project Structure
 
-```text
-backend/
-frontend/
-docker/
-docs/
-
-Quick Start
-Clone Repository
-git clone https://github.com/Silver-OPCUA-Toolkit/silver-opcua-toolkit.git
-cd silver-opcua-toolkit
-Backend Setup
-cd backend
-pip install -r requirements.txt
-Frontend Setup
-cd frontend
-npm install
-Development Status
-
-This project is currently under active development.
-
-The initial MVP focuses on realtime OPC UA monitoring and industrial visualization tools.
-
-Screenshots
-
-Screenshots will be added soon.
-
-Contributing
-
-Contributions, ideas, issue reports, and discussions are welcome.
-
-More contribution guidelines will be added soon.
-
-License
-
-Licensed under the Apache License 2.0.
-
-See the LICENSE file for details.
+Project structure will evolve during MVP development.

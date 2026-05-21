@@ -72,7 +72,7 @@ docs/
 
 Quick Start
 Clone Repository
-git clone https://github.com/YOUR_USERNAME/silver-opcua-toolkit.git
+git clone https://github.com/Silver-OPCUA-Toolkit/silver-opcua-toolkit.git
 cd silver-opcua-toolkit
 Backend Setup
 cd backend

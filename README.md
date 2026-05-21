@@ -65,3 +65,47 @@ Built with a modern full-stack architecture using Python and React.
 ## Project Structure
 
 Project structure will evolve during MVP development.
+
+## Quick Start
+
+### Requirements
+
+- Python 3.13+
+- Node.js v24.15.0
+- npm
+
+---
+
+### Clone Repository
+
+```bash
+git clone https://github.com/Armin22-Programmer/Silver-OPCUA-Toolkit.git
+cd Silver-OPCUA-Toolkit
+---
+
+### Backend Setup
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+---
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+---
+
+### Optional (Docker)
+```bash
+docker-compose up --build
+---
+
+## Demo
+- Real-time OPC UA tag streaming via WebSockets
+- Live industrial dashboard updates
+- Interactive tag browser (read/write support)
+---
+
+

@@ -18,12 +18,12 @@ function App() {
   const [page, setPage] = useState<Page>('connections')
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ backgroundColor: '#f5f7fa' }}>
       {/* Top navigation bar */}
-      <div className="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
+      <div className="border-b bg-white sticky top-0 z-10 shadow-sm">
         <div className="px-8 flex items-center gap-1 h-14">
           {/* App logo / title */}
-          <span className="text-sm font-semibold tracking-tight mr-6 text-foreground">
+          <span className="text-sm font-bold tracking-tight mr-8 text-slate-800">
             ⚙ Silver OPC UA
           </span>
 
@@ -33,11 +33,11 @@ function App() {
               key={item.id}
               onClick={() => setPage(item.id)}
               className={`
-                flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
-                transition-colors duration-150
+                relative flex items-center gap-2 px-4 py-4 text-sm font-medium
+                transition-colors duration-150 border-b-2
                 ${page === item.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
                 }
               `}
             >

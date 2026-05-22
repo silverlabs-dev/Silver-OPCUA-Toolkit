@@ -1,17 +1,29 @@
+# backend/app/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.database import init_db, AsyncSessionLocal
+from app.core.config import settings
+from app.core.logging_config import setup_logging
 from app.api.routes.connections import router as connections_router
 from app.api.routes.tags import router as tags_router
 from app.api.routes.websocket import router as websocket_router
 from app.opcua.manager import opcua_manager
 from app.models.connection import Connection
 from sqlalchemy import select
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize logging as the very first thing inside the worker process
+    setup_logging()
+
+    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.ENV}]")
+
     # Create all DB tables if they don't exist yet
     await init_db()
 
@@ -24,16 +36,22 @@ async def lifespan(app: FastAPI):
         for conn in active_connections:
             success = await opcua_manager.connect(conn.id, conn.endpoint)
             if not success:
-                # If server is unreachable, mark as inactive in DB
                 conn.is_active = False
                 await db.commit()
+                logger.warning(f"Auto-reconnect failed for connection {conn.id} ({conn.endpoint})")
+            else:
+                logger.info(f"Auto-reconnected connection {conn.id} ({conn.endpoint})")
 
     yield  # Server runs here
 
+    # Shutdown — close all active OPC UA connections cleanly
+    logger.info("Shutting down — closing all OPC UA connections...")
+    await opcua_manager.disconnect_all()
+
 
 app = FastAPI(
-    title="Industrial AI Toolkit",
-    version="0.1.0",
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
     description="OPC UA Tooling for Industrial Engineers",
     lifespan=lifespan
 )
@@ -56,4 +74,8 @@ app.include_router(websocket_router)    # /ws/{connection_id}/monitor
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint to verify the server is running."""
-    return {"status": "ok", "version": "0.1.0"}
+    return {
+        "status": "ok",
+        "version": settings.APP_VERSION,
+        "env": settings.ENV,
+    }

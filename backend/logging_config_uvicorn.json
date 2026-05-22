@@ -1,0 +1,1 @@
+﻿{"version":1,"disable_existing_loggers":false,"formatters":{},"handlers":{},"loggers":{"uvicorn":{"level":"WARNING"},"uvicorn.error":{"level":"WARNING"},"uvicorn.access":{"level":"WARNING"}}}

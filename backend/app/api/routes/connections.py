@@ -1,13 +1,18 @@
+# backend/app/api/routes/connections.py
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime, timezone
 from app.core.database import get_db
 from app.models.connection import Connection
 from app.models.schemas import ConnectionCreate, ConnectionResponse
 from app.opcua.manager import opcua_manager
+import logging
+
+logger = logging.getLogger(__name__)
 
 # APIRouter groups all endpoints under /api/v1/connections
-# tags are used for grouping in Swagger UI
 router = APIRouter(prefix="/api/v1/connections", tags=["connections"])
 
 
@@ -24,12 +29,11 @@ async def create_connection(
     db: AsyncSession = Depends(get_db)
 ):
     """Save a new OPC UA connection to the database."""
-    # Build a DB object from the validated request data
     connection = Connection(name=data.name, endpoint=data.endpoint)
     db.add(connection)
     await db.commit()
-    # Refresh to get DB-generated fields like id and created_at
     await db.refresh(connection)
+    logger.info(f"Connection created [id={connection.id}, name={connection.name}]")
     return connection
 
 
@@ -38,19 +42,23 @@ async def delete_connection(
     connection_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete a connection from the database."""
-    # Check if the connection exists before deleting
+    """Delete a connection from the database and close it if active."""
     result = await db.execute(
         select(Connection).where(Connection.id == connection_id)
     )
     connection = result.scalar_one_or_none()
 
-    # Return 404 if not found
     if not connection:
         raise HTTPException(status_code=404, detail="Connection not found")
 
+    # If connection is active, close it cleanly before deleting
+    if opcua_manager.is_connected(connection_id):
+        await opcua_manager.disconnect(connection_id)
+        logger.info(f"Closed active connection before delete [id={connection_id}]")
+
     await db.delete(connection)
     await db.commit()
+    logger.info(f"Connection deleted [id={connection_id}]")
     return {"message": "Connection deleted"}
 
 
@@ -60,7 +68,6 @@ async def connect_to_server(
     db: AsyncSession = Depends(get_db)
 ):
     """Actually connect to the OPC UA server and update status in DB."""
-    # Find the connection record in the database
     result = await db.execute(
         select(Connection).where(Connection.id == connection_id)
     )
@@ -69,16 +76,35 @@ async def connect_to_server(
     if not connection:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    # Ask OPC UA Manager to establish the real connection
-    # Returns False if server is unreachable or connection fails
     success = await opcua_manager.connect(connection_id, connection.endpoint)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to connect to OPC UA server")
 
-    # Connection succeeded — mark as active in the database
+    if not success:
+        # Record the failure in DB for observability
+        connection.is_active = False
+        connection.retry_count += 1
+        connection.last_error = f"Failed to connect to {connection.endpoint}"
+        await db.commit()
+        await db.refresh(connection)
+        logger.warning(
+            f"Connection failed [id={connection_id}, "
+            f"endpoint={connection.endpoint}, "
+            f"retry_count={connection.retry_count}]"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to connect to OPC UA server at {connection.endpoint}"
+        )
+
+    # Connection succeeded — update state
     connection.is_active = True
+    connection.last_connected_at = datetime.now(timezone.utc)
+    connection.last_error = None
+    connection.retry_count = 0
     await db.commit()
     await db.refresh(connection)
+    logger.info(
+        f"Connection established [id={connection_id}, endpoint={connection.endpoint}]"
+    )
     return connection
 
 
@@ -96,11 +122,10 @@ async def disconnect_from_server(
     if not connection:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    # Tell OPC UA Manager to close the connection
     await opcua_manager.disconnect(connection_id)
 
-    # Mark as inactive in the database
     connection.is_active = False
     await db.commit()
     await db.refresh(connection)
+    logger.info(f"Connection closed [id={connection_id}]")
     return connection

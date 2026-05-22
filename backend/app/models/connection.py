@@ -1,7 +1,10 @@
-from sqlalchemy import String, Integer, Boolean, DateTime
+# backend/app/models/connection.py
+
+from sqlalchemy import String, Integer, Boolean, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
 from app.core.database import Base
+
 
 class Connection(Base):
     __tablename__ = "connections"
@@ -14,3 +17,12 @@ class Connection(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
     )
+
+    # State machine fields — added in Alpha Hardening phase
+    last_connected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default=None
+    )
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)

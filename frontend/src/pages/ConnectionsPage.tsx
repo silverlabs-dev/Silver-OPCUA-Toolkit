@@ -1,3 +1,5 @@
+// frontend/src/pages/ConnectionsPage.tsx
+
 import { useEffect, useState } from 'react'
 import type { Connection } from '@/lib/api'
 import { connectionsApi } from '@/lib/api'
@@ -20,54 +22,39 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Trash2, Plus, Power, PowerOff } from 'lucide-react'
+import { Trash2, Plus, Power, PowerOff, Loader2, Cable, AlertCircle } from 'lucide-react'
 
 export default function ConnectionsPage() {
-  // List of all connections fetched from the database
   const [connections, setConnections] = useState<Connection[]>([])
-
-  // Controls whether the Add Connection dialog is open
   const [open, setOpen] = useState(false)
-
-  // Form field values for creating a new connection
   const [name, setName] = useState('')
   const [endpoint, setEndpoint] = useState('')
-
-  // Validation or server error message shown inside the form
   const [error, setError] = useState('')
-
-  // Tracks which connection is currently being connected/disconnected
-  // Prevents double-clicking and shows loading state
   const [loadingId, setLoadingId] = useState<number | null>(null)
 
-  // Fetch all connections from the backend and update local state
+  // Per-connection error messages shown inline in the table
+  const [connectionErrors, setConnectionErrors] = useState<Record<number, string>>({})
+
   const fetchConnections = async () => {
     const res = await connectionsApi.list()
     setConnections(res.data)
   }
 
-  // Fetch connections once when the component first renders
   useEffect(() => {
     fetchConnections()
   }, [])
 
-  // Handle creating a new connection via the form
   const handleCreate = async () => {
     setError('')
-
-    // Basic validation — both fields are required
     if (!name || !endpoint) {
       setError('All fields are required.')
       return
     }
-
     try {
       await connectionsApi.create({ name, endpoint })
-      // Reset form and close dialog on success
       setName('')
       setEndpoint('')
       setOpen(false)
-      // Refresh the list to show the new connection
       fetchConnections()
     } catch (e) {
       const err = e as { response?: { data?: { detail?: string } } }
@@ -75,27 +62,28 @@ export default function ConnectionsPage() {
     }
   }
 
-  // Handle deleting a connection by id
   const handleDelete = async (id: number) => {
     await connectionsApi.delete(id)
+    setConnectionErrors(prev => { const n = { ...prev }; delete n[id]; return n })
     fetchConnections()
   }
 
-  // Handle connecting to an OPC UA server
   const handleConnect = async (id: number) => {
     setLoadingId(id)
+    setConnectionErrors(prev => { const n = { ...prev }; delete n[id]; return n })
     try {
       await connectionsApi.connect(id)
       fetchConnections()
     } catch (e) {
-      console.error('Failed to connect:', e)
+      const err = e as { response?: { data?: { detail?: string } } }
+      const msg = err.response?.data?.detail || 'Failed to connect.'
+      setConnectionErrors(prev => ({ ...prev, [id]: msg }))
+      fetchConnections() // Refresh to get updated retry_count
     } finally {
-      // Always clear loading state whether success or failure
       setLoadingId(null)
     }
   }
 
-  // Handle disconnecting from an OPC UA server
   const handleDisconnect = async (id: number) => {
     setLoadingId(id)
     try {
@@ -109,17 +97,16 @@ export default function ConnectionsPage() {
   }
 
   return (
-    <div className="p-8">
-      {/* Page header with title and Add Connection button */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-8 max-w-6xl mx-auto">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold">OPC UA Connections</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">OPC UA Connections</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Manage your OPC UA server connections
           </p>
         </div>
 
-        {/* Dialog for adding a new connection */}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -148,9 +135,11 @@ export default function ConnectionsPage() {
                   onChange={e => setEndpoint(e.target.value)}
                 />
               </div>
-              {/* Show validation or server errors */}
               {error && (
-                <p className="text-sm text-destructive">{error}</p>
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {error}
+                </div>
               )}
               <Button className="w-full" onClick={handleCreate}>
                 Create Connection
@@ -160,73 +149,114 @@ export default function ConnectionsPage() {
         </Dialog>
       </div>
 
-      {/* Connections table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Endpoint</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {connections.map(conn => (
-            <TableRow key={conn.id}>
-              <TableCell className="font-medium">{conn.name}</TableCell>
-              <TableCell className="font-mono text-sm">{conn.endpoint}</TableCell>
+      {/* Empty state */}
+      {connections.length === 0 ? (
+        <div className="border-2 border-dashed rounded-xl p-16 text-center">
+          <Cable className="w-10 h-10 mx-auto text-muted-foreground opacity-40 mb-3" />
+          <p className="text-muted-foreground font-medium">No connections yet</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Click "Add Connection" to connect to an OPC UA server
+          </p>
+        </div>
+      ) : (
+        <div className="border rounded-xl overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="font-semibold">Name</TableHead>
+                <TableHead className="font-semibold">Endpoint</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Created</TableHead>
+                <TableHead className="font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {connections.map(conn => (
+                <>
+                  <TableRow key={conn.id} className="hover:bg-muted/20 transition-colors">
+                    <TableCell className="font-medium">{conn.name}</TableCell>
+                    <TableCell>
+                      <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">
+                        {conn.endpoint}
+                      </span>
+                    </TableCell>
 
-              {/* Status badge — green when connected, gray when disconnected */}
-              <TableCell>
-                <Badge variant={conn.is_active ? 'default' : 'secondary'}>
-                  {conn.is_active ? 'Connected' : 'Disconnected'}
-                </Badge>
-              </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${conn.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        <Badge variant={conn.is_active ? 'default' : 'secondary'}>
+                          {conn.is_active ? 'Connected' : 'Disconnected'}
+                        </Badge>
+                        {conn.retry_count > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {conn.retry_count} failed attempt{conn.retry_count > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
 
-              <TableCell className="text-muted-foreground text-sm">
-                {new Date(conn.created_at).toLocaleDateString()}
-              </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(conn.created_at).toLocaleDateString()}
+                    </TableCell>
 
-              {/* Action buttons — Connect/Disconnect + Delete */}
-              <TableCell className="flex items-center gap-2">
-                {conn.is_active ? (
-                  // Show Disconnect button when currently connected
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={loadingId === conn.id}
-                    onClick={() => handleDisconnect(conn.id)}
-                  >
-                    <PowerOff className="w-4 h-4 mr-1" />
-                    Disconnect
-                  </Button>
-                ) : (
-                  // Show Connect button when currently disconnected
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={loadingId === conn.id}
-                    onClick={() => handleConnect(conn.id)}
-                  >
-                    <Power className="w-4 h-4 mr-1" />
-                    Connect
-                  </Button>
-                )}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {conn.is_active ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loadingId === conn.id}
+                            onClick={() => handleDisconnect(conn.id)}
+                          >
+                            {loadingId === conn.id
+                              ? <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              : <PowerOff className="w-4 h-4 mr-1" />
+                            }
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loadingId === conn.id}
+                            onClick={() => handleConnect(conn.id)}
+                          >
+                            {loadingId === conn.id
+                              ? <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              : <Power className="w-4 h-4 mr-1" />
+                            }
+                            Connect
+                          </Button>
+                        )}
 
-                {/* Delete button — removes connection from database */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(conn.id)}
-                >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(conn.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Inline error row — shown when connect fails */}
+                  {connectionErrors[conn.id] && (
+                    <TableRow key={`${conn.id}-error`} className="bg-destructive/5 hover:bg-destructive/5">
+                      <TableCell colSpan={5}>
+                        <div className="flex items-center gap-2 text-sm text-destructive py-0.5">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          {connectionErrors[conn.id]}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }

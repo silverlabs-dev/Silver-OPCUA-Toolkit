@@ -1,9 +1,6 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 ![Release](https://img.shields.io/badge/release-v0.1.0--alpha-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
-![Status](https://img.shields.io/badge/status-alpha-orange)
-![Release](https://img.shields.io/badge/release-v0.1.0--alpha-blue)
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 # Silver OPC UA Toolkit
 
@@ -179,4 +176,3 @@ The project is under active development and focused on building a modern industr
 ## License
 
 Licensed under the Apache 2.0 License.
-

@@ -1,42 +1,50 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
-![Release](https://img.shields.io/badge/release-v0.1.0--alpha-blue)
+![Release](https://img.shields.io/badge/release-v0.2.0--alpha-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 # Silver OPC UA Toolkit
 
-Modern open-source OPC UA toolkit for industrial monitoring, realtime visualization, and future AI-assisted industrial workflows.
+Modern open-source OPC UA toolkit for industrial monitoring, realtime visualization, and future industrial AI workflows.
+
+Built for industrial engineers, automation developers, and Industry 4.0 environments.
 
 ---
 
 ## Overview
 
-Silver OPC UA Toolkit is an open-source industrial software platform designed for industrial engineers, automation developers, and system integrators.
+Silver OPC UA Toolkit is a modern industrial software platform focused on creating lightweight, developer-friendly, and cross-platform industrial tools around OPC UA.
 
-The project focuses on building modern tools for:
+The project aims to modernize industrial monitoring workflows with clean UI, realtime data handling, scalable OPC UA navigation, and future AI-assisted industrial tooling.
 
-* OPC UA connectivity
-* Realtime industrial monitoring
-* Industrial data visualization
-* Web-based industrial interfaces
-* Future AI-assisted industrial workflows
+Designed for:
 
-Built with a modern full-stack architecture using Python and React.
+- Industrial engineers
+- Automation developers
+- PLC programmers
+- System integrators
+- IIoT developers
+- Smart factory environments
 
 ---
 
 ## Why Silver OPC UA Toolkit?
 
-Most industrial software tools are outdated, difficult to use, Windows-only, and built around legacy workflows.
+Most industrial software tools are:
 
-Silver OPC UA Toolkit aims to provide a modern, developer-friendly, and cross-platform industrial experience with clean UI, realtime workflows, and future AI integration.
+- Outdated
+- Windows-only
+- Difficult to use
+- Built around legacy UX patterns
+- Poor at realtime workflows
 
----
+Silver OPC UA Toolkit aims to provide a modern alternative with:
 
-## Vision
-
-Silver OPC UA Toolkit aims to evolve into a modern industrial data workspace for engineers working with OPC UA, industrial monitoring, diagnostics, and future AI-assisted workflows.
-
-The long-term goal is to provide lightweight, modern, and cross-platform industrial tools that replace outdated legacy industrial software experiences.
+- Modern web-based UI
+- Realtime industrial workflows
+- Cross-platform architecture
+- Lightweight deployment
+- Open-source flexibility
+- Future-ready AI integration
 
 ---
 
@@ -44,20 +52,36 @@ The long-term goal is to provide lightweight, modern, and cross-platform industr
 
 ### Implemented
 
-* OPC UA Connection Manager
-* Tag Browser
-* Live Tag Monitoring
-* WebSocket-based realtime updates
-* Realtime Charts
+- OPC UA Connection Manager
+- Scalable Tag Browser
+- Searchable OPC UA Navigation
+- Watchlist-based monitoring workflow
+- Realtime OPC UA Monitoring
+- WebSocket-based realtime updates
+- Realtime Charts
+- Configurable monitoring windows
+- Configurable update intervals
+- Chart pause / resume
+- Boolean tag visualization (ON/OFF)
+- Structured logging
+- Dockerized deployment
+- Industrial simulator environment
 
-### Planned
+---
 
-* Historical Data Logging
-* Alarm & Events
-* MQTT Integration
-* Modbus Support
-* AI-assisted diagnostics
-* Edge deployment tools
+## Architecture Overview
+
+```text
+OPC UA Server
+      ↓
+asyncua Client Layer
+      ↓
+FastAPI Backend
+      ↓
+REST API + WebSockets
+      ↓
+React Frontend
+```
 
 ---
 
@@ -65,38 +89,43 @@ The long-term goal is to provide lightweight, modern, and cross-platform industr
 
 ### Backend
 
-* Python
-* FastAPI
-* asyncua
-* SQLAlchemy
-* WebSockets
+- Python 3.12
+- FastAPI
+- asyncua
+- SQLAlchemy (async)
+- WebSockets
+- Pydantic
+- uv
 
 ### Frontend
 
-* React
-* TypeScript
-* Tailwind CSS
-* shadcn/ui
-* Recharts
-* Vite
+- React 19
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Recharts
+- Vite
 
 ### Infrastructure
 
-* Docker (planned)
+- Docker
+- docker-compose
+- nginx
 
 ---
 
-## Quick Start
+# Quick Start
 
-### Requirements
+## Requirements
 
-* Python 3.13+
-* Node.js 22+
-* npm
+- Python 3.12+
+- Node.js 20+
+- uv (`pip install uv`)
+- Docker (optional)
 
 ---
 
-### Clone Repository
+## Clone Repository
 
 ```bash
 git clone https://github.com/silverlabs-dev/Silver-OPCUA-Toolkit.git
@@ -105,17 +134,40 @@ cd Silver-OPCUA-Toolkit
 
 ---
 
-### Backend Setup
+# Development Setup
+
+## Terminal 1 — OPC UA Simulator
 
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+uv run python simulator/server.py
+```
+
+Simulator endpoint:
+
+```text
+opc.tcp://localhost:4840
 ```
 
 ---
 
-### Frontend Setup
+## Terminal 2 — Backend
+
+```bash
+cd backend
+uv sync
+uv run python run.py
+```
+
+Backend API docs:
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## Terminal 3 — Frontend
 
 ```bash
 cd frontend
@@ -123,56 +175,107 @@ npm install
 npm run dev
 ```
 
----
+Frontend development server:
 
-## Screenshots
-
-Screenshots and demo GIFs will be added during the next UI refinement phase.
-
-Planned screenshots:
-
-* OPC UA Connection Manager
-* Tag Browser
-* Live Monitoring
-* Realtime Charts Dashboard
-* Industrial Monitoring Workspace
+```text
+http://localhost:5173
+```
 
 ---
 
-## Roadmap
+# Docker Quick Start
 
-### Near-Term
+Run the full stack with:
 
-* Watchlists system
-* Searchable tag browser
-* Enhanced realtime monitoring UX
-* Scalable OPC UA navigation
-* Docker deployment
+```bash
+docker compose up --build
+```
 
-### Mid-Term
+Services:
 
-* Historical data logging
-* MQTT integration
-* Alarm & event workflows
-* Multi-device support
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:8080 |
+| Backend API | http://localhost:8000/docs |
+| OPC UA Simulator | opc.tcp://localhost:4840 |
 
-### Long-Term
+Inside Docker containers, use:
 
-* AI-assisted diagnostics
-* Predictive maintenance
-* Industrial AI copilot
-* Cloud monitoring platform
+```text
+opc.tcp://simulator:4840
+```
 
 ---
 
-## Project Status
+# Screenshots
 
-Current status: **Alpha MVP**
+## Connections Management
 
-The project is under active development and focused on building a modern industrial monitoring foundation around OPC UA and future industrial AI workflows.
+Modern OPC UA connection management with realtime status tracking, retry monitoring, and connection lifecycle visibility.
+
+## Tag Browser
+
+Scalable industrial tag browser with search, hierarchical OPC UA navigation, and watchlist workflow.
+
+## Live Monitoring
+
+Realtime industrial monitoring dashboard with watchlists, configurable update rates, and live trend visualization.
 
 ---
 
-## License
+# Roadmap
 
-Licensed under the Apache 2.0 License.
+## Near-Term
+
+- Persistent watchlists
+- CSV export
+- Alarm visualization
+- Enhanced tag filtering
+- Multi-connection monitoring
+- Improved industrial UX workflows
+
+## Mid-Term
+
+- Historical data logging
+- MQTT integration
+- Alarm & event workflows
+- Multi-device support
+- OPC UA write support
+
+## Long-Term
+
+- AI-assisted diagnostics
+- Predictive maintenance
+- Industrial AI copilot
+- Edge AI workflows
+- Cloud monitoring platform
+
+---
+
+# Project Status
+
+Current status: **v0.2.0-alpha**
+
+The project is under active development and currently focused on building a modern industrial monitoring platform around OPC UA and future industrial AI workflows.
+
+Current alpha focus areas:
+
+- Realtime industrial monitoring
+- Modern industrial UX
+- Scalable OPC UA workflows
+- Lightweight deployment
+- Open-source industrial tooling
+
+---
+
+# Contributing
+
+Contributions, feedback, architecture discussions, and industrial workflow ideas are welcome.
+
+Contribution guidelines and issue templates will be added in upcoming releases.
+
+---
+
+# License
+
+Licensed under the Apache License 2.0.

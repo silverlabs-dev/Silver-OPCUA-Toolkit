@@ -1,9 +1,8 @@
 // frontend/src/pages/ConnectionsPage.tsx
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { Connection } from '@/lib/api'
 import { connectionsApi } from '@/lib/api'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -24,14 +23,14 @@ export default function ConnectionsPage() {
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [connectionErrors, setConnectionErrors] = useState<Record<number, string>>({})
 
-  const fetchConnections = async () => {
+  const fetchConnections = useCallback(async () => {
     const res = await connectionsApi.list()
     setConnections(res.data)
-  }
+  }, [])
 
   useEffect(() => {
     fetchConnections()
-  }, [])
+  }, [fetchConnections])
 
   const handleCreate = async () => {
     setError('')
@@ -173,19 +172,13 @@ export default function ConnectionsPage() {
                 transition-colors hover:bg-slate-50
                 ${i < connections.length - 1 ? 'border-b border-slate-100' : ''}
               `}>
-
-                {/* Name */}
                 <span className="font-medium text-slate-800 text-sm truncate">
                   {conn.name}
                 </span>
-
-                {/* Endpoint */}
                 <span className="font-mono text-xs text-slate-500 bg-slate-100
                                  px-2 py-1 rounded truncate">
                   {conn.endpoint}
                 </span>
-
-                {/* Status */}
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${
                     conn.is_active ? 'bg-green-400' : 'bg-slate-300'
@@ -201,13 +194,9 @@ export default function ConnectionsPage() {
                     </span>
                   )}
                 </div>
-
-                {/* Created */}
                 <span className="text-xs text-slate-400">
                   {new Date(conn.created_at).toLocaleDateString()}
                 </span>
-
-                {/* Actions */}
                 <div className="flex items-center gap-2">
                   {conn.is_active ? (
                     <button
@@ -238,7 +227,6 @@ export default function ConnectionsPage() {
                       Connect
                     </button>
                   )}
-
                   <button
                     onClick={() => handleDelete(conn.id)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-red-500

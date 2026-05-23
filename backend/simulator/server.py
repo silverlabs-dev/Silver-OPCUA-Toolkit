@@ -32,7 +32,9 @@ async def run_simulator():
     temperature = await device.add_variable(namespace, "Temperature", 25.0)
     pressure    = await device.add_variable(namespace, "Pressure", 101.3)
     flow_rate   = await device.add_variable(namespace, "FlowRate", 50.0)
-    is_running  = await device.add_variable(namespace, "IsRunning", True)
+
+    # IsRunning is monitored but not written — no assignment needed
+    await device.add_variable(namespace, "IsRunning", True)
 
     await temperature.set_writable()
     await pressure.set_writable()

@@ -10,6 +10,12 @@ services:
     networks:
       - opcua-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',4840)); s.close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   backend:
     build:
@@ -26,7 +32,8 @@ services:
     volumes:
       - ./data:/app/data
     depends_on:
-      - simulator
+      simulator:
+        condition: service_healthy
     networks:
       - opcua-net
     restart: unless-stopped

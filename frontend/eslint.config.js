@@ -18,5 +18,21 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // shadcn/ui components export both component and variants — this is intentional
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+      // Fetch-on-mount pattern is valid for data loading
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
+    // shadcn/ui generated files — disable react-refresh rule entirely
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

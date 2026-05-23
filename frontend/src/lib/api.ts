@@ -2,9 +2,18 @@
 
 import axios from 'axios'
 
+// In production (Docker), nginx proxies /api/ and /ws/ to backend.
+// In development, we talk directly to localhost:8000.
+const BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8000'
+const WS_BASE  = import.meta.env.PROD
+  ? `ws://${window.location.host}`
+  : 'ws://localhost:8000'
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BASE_URL,
 })
+
+export { WS_BASE }
 
 export interface Connection {
   id: number
@@ -27,6 +36,30 @@ export interface NodeInfo {
   name: string
   node_class: string
   value: string | null
+}
+
+/**
+ * Converts asyncua repr format to standard OPC UA node_id string.
+ * Input:  "NodeId(Identifier=2, NamespaceIndex=2, NodeIdType=<NodeIdType.FourByte: 1>)"
+ * Output: "ns=2;i=2"
+ */
+export function parseNodeId(raw: string): string {
+  if (!raw.startsWith('NodeId(')) return raw
+
+  const identifierMatch = raw.match(/Identifier=(\w+)/)
+  const namespaceMatch  = raw.match(/NamespaceIndex=(\d+)/)
+
+  if (identifierMatch && namespaceMatch) {
+    const identifier = identifierMatch[1]
+    const namespace  = namespaceMatch[1]
+    if (/^\d+$/.test(identifier)) {
+      return `ns=${namespace};i=${identifier}`
+    } else {
+      return `ns=${namespace};s=${identifier}`
+    }
+  }
+
+  return raw
 }
 
 export const connectionsApi = {

@@ -9,27 +9,29 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# How often (in seconds) to read and push tag values to the client
-MONITOR_INTERVAL_SECONDS = 1.0
+# Default intervals — can be overridden per connection via handshake
+DEFAULT_MONITOR_INTERVAL = 1.0
+MIN_MONITOR_INTERVAL     = 0.1   # 100ms
+MAX_MONITOR_INTERVAL     = 10.0  # 10s
 
-# How long to wait for the initial node_ids message from the client
+# Dead connection detection
+PING_INTERVAL_SECONDS    = 5.0
+
+# How long to wait for the initial handshake message
 HANDSHAKE_TIMEOUT_SECONDS = 10.0
-
-# How often to send a ping to detect dead connections
-PING_INTERVAL_SECONDS = 5.0
 
 
 @router.websocket("/ws/{connection_id}/monitor")
 async def monitor_tags(websocket: WebSocket, connection_id: int):
     """
     WebSocket endpoint for real-time tag monitoring.
-    Accepts a list of node_ids from the client, then streams
-    their current values every second until the client disconnects.
+    Accepts a list of node_ids and optional update_rate_ms from the client,
+    then streams their current values until the client disconnects.
     """
     await websocket.accept()
     logger.info(f"WebSocket opened [connection_id={connection_id}]")
 
-    # Verify OPC UA client exists before doing anything
+    # Verify OPC UA client exists
     client = opcua_manager.get_client(connection_id)
     if not client:
         logger.warning(f"WebSocket rejected — OPC UA connection {connection_id} is not active")
@@ -37,7 +39,7 @@ async def monitor_tags(websocket: WebSocket, connection_id: int):
         await websocket.close()
         return
 
-    # Wait for the client to send node_ids, with a timeout
+    # Wait for handshake with timeout
     try:
         data = await asyncio.wait_for(
             websocket.receive_json(),
@@ -58,18 +60,23 @@ async def monitor_tags(websocket: WebSocket, connection_id: int):
         await websocket.close()
         return
 
-    # Resolve node_id strings to asyncua Node objects
-    nodes = [client.get_node(nid) for nid in node_ids]
-    logger.info(f"Monitoring {len(node_ids)} tag(s) [connection_id={connection_id}]")
+    # Read optional update_rate_ms from handshake — clamp to safe range
+    update_rate_ms = data.get("update_rate_ms", DEFAULT_MONITOR_INTERVAL * 1000)
+    monitor_interval = update_rate_ms / 1000.0
+    monitor_interval = max(MIN_MONITOR_INTERVAL, min(MAX_MONITOR_INTERVAL, monitor_interval))
 
-    # Run monitor loop and ping loop concurrently
+    nodes = [client.get_node(nid) for nid in node_ids]
+    logger.info(
+        f"Monitoring {len(node_ids)} tag(s) "
+        f"[connection_id={connection_id}, interval={monitor_interval}s]"
+    )
+
     try:
         await asyncio.gather(
-            _monitor_loop(websocket, connection_id, nodes, node_ids),
+            _monitor_loop(websocket, connection_id, nodes, node_ids, monitor_interval),
             _ping_loop(websocket, connection_id),
         )
     except Exception:
-        # Either loop raised — connection is gone, fall through to cleanup
         pass
     finally:
         logger.info(f"WebSocket closed [connection_id={connection_id}]")
@@ -80,14 +87,13 @@ async def _monitor_loop(
     connection_id: int,
     nodes: list,
     node_ids: list,
+    interval: float,
 ) -> None:
     """
-    Reads all monitored tags every MONITOR_INTERVAL_SECONDS
+    Reads all monitored tags every `interval` seconds
     and pushes results to the client.
-    Exits when the WebSocket is closed or OPC UA connection is lost.
     """
     while True:
-        # Check OPC UA connection is still alive before reading
         if not opcua_manager.is_connected(connection_id):
             logger.warning(f"OPC UA connection lost during monitoring [connection_id={connection_id}]")
             await websocket.send_json({"error": "OPC UA connection lost."})
@@ -104,7 +110,6 @@ async def _monitor_loop(
                     "error": None
                 })
             except Exception as e:
-                # Tag read failed — report it but keep monitoring other tags
                 readings.append({
                     "node_id": node_ids[i],
                     "value": None,
@@ -112,14 +117,12 @@ async def _monitor_loop(
                 })
 
         await websocket.send_json({"readings": readings})
-        await asyncio.sleep(MONITOR_INTERVAL_SECONDS)
+        await asyncio.sleep(interval)
 
 
 async def _ping_loop(websocket: WebSocket, connection_id: int) -> None:
     """
-    Sends a WebSocket ping every PING_INTERVAL_SECONDS.
-    If the client is gone, ping() raises and the loop exits —
-    which cancels _monitor_loop via asyncio.gather().
+    Sends a ping every PING_INTERVAL_SECONDS to detect dead connections.
     """
     while True:
         await asyncio.sleep(PING_INTERVAL_SECONDS)

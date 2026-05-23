@@ -210,15 +210,15 @@ opc.tcp://simulator:4840
 # Screenshots
 
 ## Connections Management
-
+![Connections](docs/screenshots/connections.png)
 Modern OPC UA connection management with realtime status tracking, retry monitoring, and connection lifecycle visibility.
 
 ## Tag Browser
-
+![Connections](docs/screenshots/tag-browser.png)
 Scalable industrial tag browser with search, hierarchical OPC UA navigation, and watchlist workflow.
 
 ## Live Monitoring
-
+![Connections](docs/screenshots/live-monitor.png)
 Realtime industrial monitoring dashboard with watchlists, configurable update rates, and live trend visualization.
 
 ---
@@ -278,4 +278,8 @@ Contribution guidelines and issue templates will be added in upcoming releases.
 
 # License
 
+<<<<<<< HEAD
 Licensed under the Apache License 2.0.
+=======
+Licensed under the Apache License 2.0.
+>>>>>>> fba245b (docs: improve README and add screenshots)

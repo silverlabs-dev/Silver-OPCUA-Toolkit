@@ -1,25 +1,29 @@
 // frontend/src/pages/MonitorPage.tsx
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useWatchlist } from '@/lib/watchlist'
-import { Activity, X, Loader2, Radio, Pause, Play, Settings2 } from 'lucide-react'
+import {
+  Activity, X, Loader2, Radio, Pause, Play,
+  Settings2, Download, FileDown
+} from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
 const CHART_COLORS = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#3b82f6', '#ec4899']
 
-// Time window options in seconds
 const TIME_WINDOW_OPTIONS = [
-  { label: '30s',  value: 30 },
-  { label: '1m',   value: 60 },
-  { label: '2m',   value: 120 },
-  { label: '5m',   value: 300 },
-  { label: '10m',  value: 600 },
+  { label: '30s', value: 30 },
+  { label: '1m',  value: 60 },
+  { label: '2m',  value: 120 },
+  { label: '5m',  value: 300 },
+  { label: '10m', value: 600 },
 ]
 
-// Update rate options in milliseconds
 const UPDATE_RATE_OPTIONS = [
   { label: '100ms', value: 100 },
   { label: '500ms', value: 500 },
@@ -31,11 +35,59 @@ const UPDATE_RATE_OPTIONS = [
 export default function MonitorPage() {
   const {
     watchlist, removeTag, clearWatchlist,
-    readings, chartData, isStreaming, isPaused, settings,
+    readings, chartData, fullBuffer, isStreaming, isPaused, settings,
     startStream, stopStream, togglePause, updateSettings,
   } = useWatchlist()
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showExport, setShowExport]     = useState(false)
+  const [exportSeconds, setExportSeconds] = useState<number>(30)
+
+  const maxBufferSeconds = useMemo(() => {
+    if (fullBuffer.length === 0) return 0
+    return Math.ceil(fullBuffer[fullBuffer.length - 1].elapsed)
+  }, [fullBuffer])
+
+  const exportRowCount = useMemo(() => {
+    const cutoff = maxBufferSeconds - exportSeconds
+    return fullBuffer.filter(p => p.elapsed >= cutoff).length
+  }, [fullBuffer, maxBufferSeconds, exportSeconds])
+
+  const handleExport = () => {
+    if (fullBuffer.length === 0) return
+
+    const cutoff = maxBufferSeconds - exportSeconds
+    const rows = fullBuffer.filter(p => p.elapsed >= cutoff)
+    const tagNames = watchlist.map(t => t.name)
+
+    // Header row
+    const header = ['#', 'DateTime', 'Elapsed (s)', ...tagNames].join('\t')
+
+    // Data rows — tab separated, with record number and real datetime
+    const streamStartMs = Date.now() - (maxBufferSeconds * 1000)
+    const lines = rows.map((point, idx) => {
+      const recordTime = new Date(streamStartMs + point.elapsed * 1000)
+      const dateStr = recordTime.toISOString().replace('T', ' ').slice(0, 23)
+      const values = tagNames.map(name => {
+        const val = point[name]
+        if (val === undefined) return ''
+        if (val === 1 && watchlist.find(t => t.name === name)) return val
+        return String(val)
+      })
+      return [idx + 1, dateStr, point.elapsed.toFixed(2), ...values].join('\t')
+    })
+
+    // TSV content (tab-separated opens correctly in Excel)
+    const tsv = [header, ...lines].join('\n')
+    const blob = new Blob(['\ufeff' + tsv], { type: 'text/tab-separated-values;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href     = url
+    link.download = `silver_opcua_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.tsv`
+    link.click()
+    URL.revokeObjectURL(url)
+    setShowExport(false)
+  }
 
   // ── Empty state ──
   if (watchlist.length === 0) {
@@ -56,6 +108,80 @@ export default function MonitorPage() {
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col" style={{ backgroundColor: '#f1f5f9' }}>
 
+      {/* ── Export Dialog ── */}
+      <Dialog open={showExport} onOpenChange={setShowExport}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Export Data</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-slate-500">
+              Select how many seconds of recorded data to export.
+              The file opens directly in Excel with separate columns for each tag.
+            </p>
+
+            {/* Slider */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Export window</span>
+                <span className="text-sm font-mono font-semibold text-indigo-600">
+                  {exportSeconds >= 60
+                    ? `${(exportSeconds / 60).toFixed(1)}m`
+                    : `${exportSeconds}s`
+                  }
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={Math.max(exportSeconds, maxBufferSeconds)}
+                value={exportSeconds}
+                onChange={e => setExportSeconds(Number(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+              <div className="flex justify-between text-xs text-slate-400">
+                <span>1s</span>
+                <span>Total recorded: {maxBufferSeconds}s</span>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-slate-50 rounded-lg px-4 py-3 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Records</span>
+                <span className="font-medium text-slate-700">{exportRowCount}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Tags</span>
+                <span className="font-medium text-slate-700">{watchlist.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Format</span>
+                <span className="font-medium text-slate-700">TSV — opens in Excel</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Columns</span>
+                <span className="font-medium text-slate-700">
+                  #, DateTime, Elapsed, {watchlist.map(t => t.name).join(', ')}
+                </span>
+              </div>
+            </div>
+
+            {/* Download button */}
+            <button
+              onClick={handleExport}
+              disabled={fullBuffer.length === 0}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium
+                         bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              Download File
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Toolbar ── */}
       <div className="bg-white border-b px-6 py-3 flex items-center gap-3 shrink-0"
            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
@@ -69,10 +195,25 @@ export default function MonitorPage() {
           <span className="text-sm text-slate-500">
             {watchlist.length} tag{watchlist.length > 1 ? 's' : ''} in watchlist
           </span>
+          {fullBuffer.length > 0 && (
+            <span className="text-xs text-slate-400">
+              · {maxBufferSeconds}s recorded
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Settings toggle */}
+          {fullBuffer.length > 0 && (
+            <button
+              onClick={() => setShowExport(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                         border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </button>
+          )}
+
           <button
             onClick={() => setShowSettings(p => !p)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
@@ -86,7 +227,6 @@ export default function MonitorPage() {
             Settings
           </button>
 
-          {/* Pause/Resume — only when streaming */}
           {isStreaming && (
             <button
               onClick={togglePause}
@@ -100,7 +240,6 @@ export default function MonitorPage() {
             </button>
           )}
 
-          {/* Start/Stop */}
           {isStreaming ? (
             <button
               onClick={stopStream}
@@ -133,8 +272,6 @@ export default function MonitorPage() {
       {/* ── Settings panel ── */}
       {showSettings && (
         <div className="bg-white border-b px-6 py-3 flex items-center gap-8 shrink-0">
-
-          {/* Time window */}
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">
               Time Window
@@ -156,10 +293,8 @@ export default function MonitorPage() {
             </div>
           </div>
 
-          {/* Divider */}
           <div className="w-px h-6 bg-slate-200" />
 
-          {/* Update rate */}
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">
               Update Rate
@@ -203,7 +338,6 @@ export default function MonitorPage() {
               const reading = readings[tag.node_id]
               const color = CHART_COLORS[index % CHART_COLORS.length]
 
-              // Format display value — bool shows ON/OFF
               let displayValue = reading?.value ?? null
               if (displayValue?.toLowerCase() === 'true')  displayValue = 'ON'
               if (displayValue?.toLowerCase() === 'false') displayValue = 'OFF'
@@ -253,7 +387,6 @@ export default function MonitorPage() {
             </div>
           ) : (
             <div className="space-y-4">
-
               {/* Value cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {watchlist.map((tag, index) => {
@@ -319,7 +452,6 @@ export default function MonitorPage() {
                         fontSize: '12px'
                       }}
                       formatter={(value, name) => {
-                        // Show ON/OFF for boolean values in tooltip
                         if (value === 1) return ['ON', name]
                         if (value === 0) return ['OFF', name]
                         return [value, name]

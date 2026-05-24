@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { Connection } from '@/lib/api'
 import { connectionsApi } from '@/lib/api'
+import { useWatchlist } from '@/lib/watchlist'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -15,6 +16,8 @@ import {
 import { Trash2, Plus, Power, PowerOff, Loader2, Cable, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function ConnectionsPage() {
+  const { removeTagsByConnection } = useWatchlist()
+
   const [connections, setConnections] = useState<Connection[]>([])
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -51,6 +54,8 @@ export default function ConnectionsPage() {
   }
 
   const handleDelete = async (id: number) => {
+    // Remove watchlist tags for this connection before deleting
+    removeTagsByConnection(id)
     await connectionsApi.delete(id)
     setConnectionErrors(prev => { const n = { ...prev }; delete n[id]; return n })
     fetchConnections()

@@ -1,14 +1,14 @@
 // frontend/src/pages/MonitorPage.tsx
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useWatchlist } from '@/lib/watchlist'
 import {
   Activity, X, Loader2, Radio, Pause, Play,
-  Settings2, Download, FileDown
+  Settings2, Download, FileDown, SlidersHorizontal
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  Tooltip, Legend, ResponsiveContainer, ReferenceLine
 } from 'recharts'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -32,6 +32,58 @@ const UPDATE_RATE_OPTIONS = [
   { label: '10s',   value: 10000 },
 ]
 
+interface Threshold {
+  warningHigh:  number | null
+  warningLow:   number | null
+  criticalHigh: number | null
+  criticalLow:  number | null
+}
+
+type ThresholdMap = Record<string, Threshold>
+
+function emptyThreshold(): Threshold {
+  return { warningHigh: null, warningLow: null, criticalHigh: null, criticalLow: null }
+}
+
+function getAlarmState(value: string | null, threshold: Threshold | undefined): 'critical' | 'warning' | 'normal' {
+  if (!value || !threshold) return 'normal'
+  const n = parseFloat(value)
+  if (isNaN(n)) return 'normal'
+
+  if (
+    (threshold.criticalHigh !== null && n >= threshold.criticalHigh) ||
+    (threshold.criticalLow  !== null && n <= threshold.criticalLow)
+  ) return 'critical'
+
+  if (
+    (threshold.warningHigh !== null && n >= threshold.warningHigh) ||
+    (threshold.warningLow  !== null && n <= threshold.warningLow)
+  ) return 'warning'
+
+  return 'normal'
+}
+
+const ALARM_STYLES = {
+  critical: {
+    card:   'border-red-300 bg-red-50',
+    label:  'text-red-400',
+    value:  'text-red-700',
+    badge:  'bg-red-100 text-red-600',
+  },
+  warning: {
+    card:   'border-amber-300 bg-amber-50',
+    label:  'text-amber-500',
+    value:  'text-amber-700',
+    badge:  'bg-amber-100 text-amber-600',
+  },
+  normal: {
+    card:   'border-slate-200 bg-white',
+    label:  'text-slate-400',
+    value:  'text-slate-800',
+    badge:  '',
+  },
+}
+
 export default function MonitorPage() {
   const {
     watchlist, removeTag, clearWatchlist,
@@ -42,6 +94,25 @@ export default function MonitorPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showExport, setShowExport]     = useState(false)
   const [exportSeconds, setExportSeconds] = useState<number>(30)
+
+
+  // Threshold state — keyed by node_id, persisted to localStorage
+  const [thresholds, setThresholds] = useState<ThresholdMap>(() => {
+    try {
+      const raw = localStorage.getItem('silver_opcua_thresholds')
+      if (!raw) return {}
+      return JSON.parse(raw) as ThresholdMap
+    } catch { return {} }
+  })
+  // Which tag's threshold dialog is open
+  const [thresholdTag, setThresholdTag] = useState<string | null>(null)
+  const [thresholdDraft, setThresholdDraft] = useState<Threshold>(emptyThreshold())
+  // Persist thresholds to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem('silver_opcua_thresholds', JSON.stringify(thresholds))
+    } catch { /* ignore */ }
+  }, [thresholds])
 
   const maxBufferSeconds = useMemo(() => {
     if (fullBuffer.length === 0) return 0
@@ -55,39 +126,61 @@ export default function MonitorPage() {
 
   const handleExport = () => {
     if (fullBuffer.length === 0) return
-
     const cutoff = maxBufferSeconds - exportSeconds
     const rows = fullBuffer.filter(p => p.elapsed >= cutoff)
     const tagNames = watchlist.map(t => t.name)
-
-    // Header row
-    const header = ['#', 'DateTime', 'Elapsed (s)', ...tagNames].join('\t')
-
-    // Data rows — tab separated, with record number and real datetime
+    const header = ['#', 'DateTime', 'Elapsed (s)', ...tagNames].join(',')
     const streamStartMs = Date.now() - (maxBufferSeconds * 1000)
     const lines = rows.map((point, idx) => {
       const recordTime = new Date(streamStartMs + point.elapsed * 1000)
       const dateStr = recordTime.toISOString().replace('T', ' ').slice(0, 23)
       const values = tagNames.map(name => {
         const val = point[name]
-        if (val === undefined) return ''
-        if (val === 1 && watchlist.find(t => t.name === name)) return val
-        return String(val)
+        return val !== undefined ? String(val) : ''
       })
-      return [idx + 1, dateStr, point.elapsed.toFixed(2), ...values].join('\t')
+      return [idx + 1, dateStr, point.elapsed.toFixed(2), ...values].join(',')
     })
-
-    // TSV content (tab-separated opens correctly in Excel)
-    const tsv = [header, ...lines].join('\n')
-    const blob = new Blob(['\ufeff' + tsv], { type: 'text/tab-separated-values;charset=utf-8;' })
+    const csv = [header, ...lines].join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href     = url
-    link.download = `silver_opcua_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.tsv`
+    link.download = `silver_opcua_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.csv`
     link.click()
     URL.revokeObjectURL(url)
     setShowExport(false)
   }
+
+  const openThresholdDialog = (node_id: string) => {
+    setThresholdDraft(thresholds[node_id] ?? emptyThreshold())
+    setThresholdTag(node_id)
+  }
+
+  const saveThreshold = () => {
+    if (!thresholdTag) return
+    setThresholds(prev => ({ ...prev, [thresholdTag]: thresholdDraft }))
+    setThresholdTag(null)
+  }
+
+  const clearThreshold = () => {
+    if (!thresholdTag) return
+    setThresholds(prev => { const n = { ...prev }; delete n[thresholdTag]; return n })
+    setThresholdTag(null)
+  }
+
+  // Collect all reference lines for chart
+  const referenceLines = useMemo(() => {
+    const lines: { value: number; color: string; label: string }[] = []
+    watchlist.forEach(tag => {
+      const t = thresholds[tag.node_id]
+      if (!t) return
+      if (t.criticalHigh !== null) lines.push({ value: t.criticalHigh, color: '#ef4444', label: `${tag.name} Critical High` })
+      if (t.criticalLow  !== null) lines.push({ value: t.criticalLow,  color: '#ef4444', label: `${tag.name} Critical Low` })
+      if (t.warningHigh  !== null) lines.push({ value: t.warningHigh,  color: '#f59e0b', label: `${tag.name} Warning High` })
+      if (t.warningLow   !== null) lines.push({ value: t.warningLow,   color: '#f59e0b', label: `${tag.name} Warning Low` })
+    })
+    return lines
+  }, [thresholds, watchlist])
 
   // ── Empty state ──
   if (watchlist.length === 0) {
@@ -108,20 +201,126 @@ export default function MonitorPage() {
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col" style={{ backgroundColor: '#f1f5f9' }}>
 
+      {/* ── Threshold Dialog ── */}
+      <Dialog open={thresholdTag !== null} onOpenChange={open => !open && setThresholdTag(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Thresholds — {watchlist.find(t => t.node_id === thresholdTag)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-slate-400">
+              Set warning and critical limits. The value card and chart will highlight
+              when the tag exceeds these thresholds. Leave blank to disable.
+            </p>
+
+            {/* Warning */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">
+                Warning
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">High</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 35"
+                    value={thresholdDraft.warningHigh ?? ''}
+                    onChange={e => setThresholdDraft(prev => ({
+                      ...prev,
+                      warningHigh: e.target.value === '' ? null : parseFloat(e.target.value)
+                    }))}
+                    className="w-full px-3 py-1.5 text-sm border border-amber-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Low</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 15"
+                    value={thresholdDraft.warningLow ?? ''}
+                    onChange={e => setThresholdDraft(prev => ({
+                      ...prev,
+                      warningLow: e.target.value === '' ? null : parseFloat(e.target.value)
+                    }))}
+                    className="w-full px-3 py-1.5 text-sm border border-amber-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Critical */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-red-600 uppercase tracking-wide">
+                Critical
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">High</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 40"
+                    value={thresholdDraft.criticalHigh ?? ''}
+                    onChange={e => setThresholdDraft(prev => ({
+                      ...prev,
+                      criticalHigh: e.target.value === '' ? null : parseFloat(e.target.value)
+                    }))}
+                    className="w-full px-3 py-1.5 text-sm border border-red-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-red-300 bg-red-50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Low</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 10"
+                    value={thresholdDraft.criticalLow ?? ''}
+                    onChange={e => setThresholdDraft(prev => ({
+                      ...prev,
+                      criticalLow: e.target.value === '' ? null : parseFloat(e.target.value)
+                    }))}
+                    className="w-full px-3 py-1.5 text-sm border border-red-200 rounded-lg
+                               focus:outline-none focus:ring-2 focus:ring-red-300 bg-red-50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={saveThreshold}
+                className="flex-1 py-2 rounded-lg text-sm font-medium
+                           bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+              >
+                Apply
+              </button>
+              <button
+                onClick={clearThreshold}
+                className="px-4 py-2 rounded-lg text-sm font-medium
+                           border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Export Dialog ── */}
       <Dialog open={showExport} onOpenChange={setShowExport}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Export Data</DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4 mt-2">
             <p className="text-xs text-slate-500">
               Select how many seconds of recorded data to export.
               The file opens directly in Excel with separate columns for each tag.
             </p>
-
-            {/* Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-700">Export window</span>
@@ -145,8 +344,6 @@ export default function MonitorPage() {
                 <span>Total recorded: {maxBufferSeconds}s</span>
               </div>
             </div>
-
-            {/* Summary */}
             <div className="bg-slate-50 rounded-lg px-4 py-3 space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-500">Records</span>
@@ -157,18 +354,12 @@ export default function MonitorPage() {
                 <span className="font-medium text-slate-700">{watchlist.length}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Format</span>
-                <span className="font-medium text-slate-700">TSV — opens in Excel</span>
-              </div>
-              <div className="flex justify-between text-xs">
                 <span className="text-slate-500">Columns</span>
                 <span className="font-medium text-slate-700">
                   #, DateTime, Elapsed, {watchlist.map(t => t.name).join(', ')}
                 </span>
               </div>
             </div>
-
-            {/* Download button */}
             <button
               onClick={handleExport}
               disabled={fullBuffer.length === 0}
@@ -176,7 +367,7 @@ export default function MonitorPage() {
                          bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
               <FileDown className="w-4 h-4" />
-              Download File
+              Download CSV
             </button>
           </div>
         </DialogContent>
@@ -196,9 +387,7 @@ export default function MonitorPage() {
             {watchlist.length} tag{watchlist.length > 1 ? 's' : ''} in watchlist
           </span>
           {fullBuffer.length > 0 && (
-            <span className="text-xs text-slate-400">
-              · {maxBufferSeconds}s recorded
-            </span>
+            <span className="text-xs text-slate-400">· {maxBufferSeconds}s recorded</span>
           )}
         </div>
 
@@ -292,9 +481,7 @@ export default function MonitorPage() {
               ))}
             </div>
           </div>
-
           <div className="w-px h-6 bg-slate-200" />
-
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">
               Update Rate
@@ -315,7 +502,6 @@ export default function MonitorPage() {
               ))}
             </div>
           </div>
-
           <p className="text-xs text-slate-400 ml-auto">
             * Update rate takes effect on next stream start
           </p>
@@ -337,6 +523,7 @@ export default function MonitorPage() {
             {watchlist.map((tag, index) => {
               const reading = readings[tag.node_id]
               const color = CHART_COLORS[index % CHART_COLORS.length]
+              const alarm = getAlarmState(reading?.value ?? null, thresholds[tag.node_id])
 
               let displayValue = reading?.value ?? null
               if (displayValue?.toLowerCase() === 'true')  displayValue = 'ON'
@@ -345,7 +532,9 @@ export default function MonitorPage() {
               return (
                 <div
                   key={tag.node_id}
-                  className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-50 group"
+                  className={`flex items-center gap-2 px-2 py-2 rounded-md group
+                    ${alarm === 'critical' ? 'bg-red-50' : alarm === 'warning' ? 'bg-amber-50' : 'hover:bg-slate-50'}
+                  `}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: color }} />
@@ -354,13 +543,28 @@ export default function MonitorPage() {
                     <p className="text-xs text-slate-400 truncate">{tag.connection_name}</p>
                   </div>
                   {displayValue && (
-                    <span className="font-mono text-xs text-slate-600 shrink-0">
+                    <span className={`font-mono text-xs shrink-0 font-medium
+                      ${alarm === 'critical' ? 'text-red-600' : alarm === 'warning' ? 'text-amber-600' : 'text-slate-600'}
+                    `}>
                       {displayValue}
                     </span>
                   )}
                   {isStreaming && !reading && (
                     <Loader2 className="w-3 h-3 animate-spin text-slate-300 shrink-0" />
                   )}
+                  {/* Threshold settings button */}
+                  <button
+                    onClick={() => openThresholdDialog(tag.node_id)}
+                    className={`shrink-0 p-0.5 rounded transition-colors
+                      ${thresholds[tag.node_id]
+                        ? 'text-indigo-400 opacity-100'
+                        : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-indigo-400'
+                      }
+                    `}
+                    title="Set thresholds"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => removeTag(tag.node_id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
@@ -391,7 +595,9 @@ export default function MonitorPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {watchlist.map((tag, index) => {
                   const reading = readings[tag.node_id]
-                  const color = CHART_COLORS[index % CHART_COLORS.length]
+                  const color   = CHART_COLORS[index % CHART_COLORS.length]
+                  const alarm   = getAlarmState(reading?.value ?? null, thresholds[tag.node_id])
+                  const style   = ALARM_STYLES[alarm]
 
                   let displayValue = reading?.value ?? '—'
                   if (displayValue.toLowerCase() === 'true')  displayValue = 'ON'
@@ -400,21 +606,39 @@ export default function MonitorPage() {
                   return (
                     <div
                       key={tag.node_id}
-                      className="bg-white border rounded-xl p-4"
+                      className={`border rounded-xl p-4 relative transition-colors ${style.card}`}
                       style={{
                         borderLeftWidth: 3,
-                        borderLeftColor: color,
+                        borderLeftColor: alarm === 'critical' ? '#ef4444' : alarm === 'warning' ? '#f59e0b' : color,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                       }}
                     >
-                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1 truncate">
-                        {tag.name}
-                      </p>
-                      <p className={`font-mono font-semibold text-slate-800 tabular-nums
+                      <div className="flex items-start justify-between mb-1">
+                        <p className={`text-xs font-medium uppercase tracking-wide truncate ${style.label}`}>
+                          {tag.name}
+                        </p>
+                        {/* Alarm badge */}
+                        {alarm !== 'normal' && (
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ml-1 ${style.badge}`}>
+                            {alarm === 'critical' ? '⚠ CRIT' : '⚠ WARN'}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`font-mono font-semibold tabular-nums ${style.value}
                         ${displayValue === 'ON' || displayValue === 'OFF' ? 'text-lg' : 'text-2xl'}
                       `}>
                         {displayValue}
                       </p>
+                      {/* Threshold settings button on card */}
+                      <button
+                        onClick={() => openThresholdDialog(tag.node_id)}
+                        className="absolute top-2 right-2 p-1 rounded text-slate-300
+                                   hover:text-indigo-400 hover:bg-white/60 transition-colors opacity-0
+                                   group-hover:opacity-100"
+                        title="Set thresholds"
+                      >
+                        <SlidersHorizontal className="w-3 h-3" />
+                      </button>
                       {reading?.error && (
                         <p className="text-xs text-red-400 mt-1 truncate">{reading.error}</p>
                       )}
@@ -458,6 +682,24 @@ export default function MonitorPage() {
                       }}
                     />
                     <Legend />
+
+                    {/* Threshold reference lines */}
+                    {referenceLines.map((ref, i) => (
+                      <ReferenceLine
+                        key={i}
+                        y={ref.value}
+                        stroke={ref.color}
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: ref.label,
+                          position: 'insideTopRight',
+                          fontSize: 10,
+                          fill: ref.color,
+                        }}
+                      />
+                    ))}
+
                     {watchlist.map((tag, index) => (
                       <Line
                         key={tag.node_id}

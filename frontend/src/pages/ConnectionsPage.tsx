@@ -13,7 +13,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Trash2, Plus, Power, PowerOff, Loader2, Cable, AlertCircle, CheckCircle2 } from 'lucide-react'
+import {
+  Trash2, Plus, Power, PowerOff, Loader2,
+  Cable, AlertCircle, CheckCircle2, Server,
+} from 'lucide-react'
+
+// ── Helpers ──────────────────────────────────────────
+
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+      style={active
+        ? { background: '#F0FDF4', color: '#16A34A', border: '1px solid #BBF7D0' }
+        : { background: '#F8FAFC', color: '#94A3B8', border: '1px solid #E2E8F0' }
+      }
+    >
+      <span
+        className="inline-block rounded-full shrink-0"
+        style={{
+          width: '6px', height: '6px',
+          background: active ? '#16A34A' : '#CBD5E1',
+        }}
+      />
+      {active ? 'Connected' : 'Disconnected'}
+    </span>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────
 
 export default function ConnectionsPage() {
   const { removeTagsByConnection } = useWatchlist()
@@ -54,7 +82,6 @@ export default function ConnectionsPage() {
   }
 
   const handleDelete = async (id: number) => {
-    // Remove watchlist tags for this connection before deleting
     removeTagsByConnection(id)
     await connectionsApi.delete(id)
     setConnectionErrors(prev => { const n = { ...prev }; delete n[id]; return n })
@@ -89,57 +116,99 @@ export default function ConnectionsPage() {
     }
   }
 
+  // ── Stats ──
+  const total       = connections.length
+  const connected   = connections.filter(c => c.is_active).length
+  const disconnected = total - connected
+
+  // ── Render ──────────────────────────────────────────
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-800">OPC UA Connections</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your OPC UA server connections</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            OPC UA Connections
+          </h1>
+          <p style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '4px' }}>
+            Manage your OPC UA server connections
+          </p>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
-                               bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm">
-              <Plus className="w-4 h-4" />
+            <button
+              className="flex items-center gap-2 transition-colors"
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                background: '#6366F1',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#4F46E5')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#6366F1')}
+            >
+              <Plus className="w-3.5 h-3.5" />
               Add Connection
             </button>
           </DialogTrigger>
-          <DialogContent className="border border-slate-200 shadow-elevated">
+          <DialogContent className="border border-slate-200" style={{ borderRadius: '14px' }}>
             <DialogHeader>
-              <DialogTitle className="text-slate-800">New OPC UA Connection</DialogTitle>
+              <DialogTitle style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
+                New OPC UA Connection
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-2">
               <div className="space-y-1.5">
-                <Label className="text-slate-700 font-medium">Name</Label>
+                <Label style={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
+                  Name
+                </Label>
                 <Input
                   placeholder="e.g. Reactor PLC"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="border-slate-200 focus:border-indigo-400 focus:ring-indigo-300"
+                  style={{ fontSize: '12.5px' }}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-700 font-medium">Endpoint</Label>
+                <Label style={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
+                  Endpoint
+                </Label>
                 <Input
                   placeholder="opc.tcp://192.168.1.100:4840"
                   value={endpoint}
                   onChange={e => setEndpoint(e.target.value)}
-                  className="border-slate-200 focus:border-indigo-400 focus:ring-indigo-300 font-mono text-sm"
+                  className="border-slate-200 focus:border-indigo-400 focus:ring-indigo-300"
+                  style={{ fontSize: '12px', fontFamily: 'ui-monospace, monospace' }}
                 />
               </div>
               {error && (
-                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                <div className="flex items-center gap-2 text-xs bg-red-50 px-3 py-2.5 rounded-lg"
+                     style={{ color: '#DC2626', border: '1px solid #FECACA' }}>
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {error}
                 </div>
               )}
               <button
                 onClick={handleCreate}
-                className="w-full py-2 rounded-lg text-sm font-medium
-                           bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+                className="w-full transition-colors"
+                style={{
+                  padding: '9px',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  background: '#6366F1',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
                 Create Connection
               </button>
@@ -148,22 +217,97 @@ export default function ConnectionsPage() {
         </Dialog>
       </div>
 
-      {/* Empty state */}
+      {/* ── Stat cards ── */}
+      {total > 0 && (
+        <div className="grid grid-cols-3 gap-4 mb-7">
+          {[
+            {
+              icon: <Cable className="w-4 h-4" />,
+              value: total,
+              label: 'Total Connections',
+              iconStyle: { background: '#EEF2FF', color: '#6366F1' },
+            },
+            {
+              icon: <CheckCircle2 className="w-4 h-4" />,
+              value: connected,
+              label: 'Connected',
+              iconStyle: { background: '#F0FDF4', color: '#16A34A' },
+              valueColor: connected > 0 ? '#16A34A' : undefined,
+            },
+            {
+              icon: <AlertCircle className="w-4 h-4" />,
+              value: disconnected,
+              label: 'Disconnected',
+              iconStyle: { background: '#FFFBEB', color: '#D97706' },
+              valueColor: disconnected > 0 ? '#D97706' : undefined,
+            },
+          ].map(s => (
+            <div key={s.label} className="card flex items-center gap-3 px-4 py-3.5">
+              <div
+                className="flex items-center justify-center shrink-0"
+                style={{ width: '36px', height: '36px', borderRadius: '8px', ...s.iconStyle }}
+              >
+                {s.icon}
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1,
+                    color: s.valueColor ?? '#0F172A',
+                  }}
+                >
+                  {s.value}
+                </div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '3px', fontWeight: 500 }}>
+                  {s.label}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
       {connections.length === 0 ? (
-        <div className="card p-16 text-center">
-          <Cable className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-          <p className="text-slate-500 font-medium">No connections yet</p>
-          <p className="text-slate-400 text-sm mt-1">
+        <div className="card flex flex-col items-center justify-center py-16 text-center">
+          <div
+            className="flex items-center justify-center mb-4"
+            style={{
+              width: '48px', height: '48px', borderRadius: '12px',
+              background: '#F8FAFC', border: '1px solid #E2E8F0',
+            }}
+          >
+            <Cable className="w-5 h-5" style={{ color: '#CBD5E1' }} />
+          </div>
+          <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#475569' }}>
+            No connections yet
+          </p>
+          <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
             Click "Add Connection" to connect to an OPC UA server
           </p>
         </div>
       ) : (
         <div className="card overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr] gap-4 px-5 py-3
-                          bg-slate-50 border-b border-slate-100">
+
+          {/* Table head */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 2fr 130px 110px 160px',
+              gap: '12px',
+              padding: '9px 16px',
+              background: '#F8FAFC',
+              borderBottom: '1px solid #E2E8F0',
+            }}
+          >
             {['Name', 'Endpoint', 'Status', 'Created', 'Actions'].map(h => (
-              <span key={h} className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              <span
+                key={h}
+                style={{
+                  fontSize: '10.5px', fontWeight: 600,
+                  color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em',
+                }}
+              >
                 {h}
               </span>
             ))}
@@ -172,44 +316,91 @@ export default function ConnectionsPage() {
           {/* Table rows */}
           {connections.map((conn, i) => (
             <div key={conn.id}>
-              <div className={`
-                grid grid-cols-[1fr_2fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
-                transition-colors hover:bg-slate-50
-                ${i < connections.length - 1 ? 'border-b border-slate-100' : ''}
-              `}>
-                <span className="font-medium text-slate-800 text-sm truncate">
-                  {conn.name}
-                </span>
-                <span className="font-mono text-xs text-slate-500 bg-slate-100
-                                 px-2 py-1 rounded truncate">
+              <div
+                className="transition-colors"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 2fr 130px 110px 160px',
+                  gap: '12px',
+                  padding: '13px 16px',
+                  alignItems: 'center',
+                  borderBottom: i < connections.length - 1 ? '1px solid #F1F5F9' : 'none',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FAFBFF')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
+              >
+                {/* Name */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className="flex items-center justify-center shrink-0"
+                    style={{
+                      width: '28px', height: '28px', borderRadius: '7px',
+                      background: conn.is_active ? '#EEF2FF' : '#F8FAFC',
+                      border: '1px solid',
+                      borderColor: conn.is_active ? '#C7D2FE' : '#E2E8F0',
+                    }}
+                  >
+                    <Server
+                      className="w-3.5 h-3.5"
+                      style={{ color: conn.is_active ? '#6366F1' : '#CBD5E1' }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}
+                         className="truncate">
+                      {conn.name}
+                    </div>
+                    {conn.retry_count > 0 && (
+                      <div style={{ fontSize: '10.5px', color: '#EF4444', marginTop: '1px' }}>
+                        {conn.retry_count} failed attempt{conn.retry_count > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Endpoint */}
+                <span
+                  className="truncate"
+                  style={{
+                    display: 'inline-block',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '5px',
+                    padding: '3px 8px',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: '11.5px',
+                    color: '#475569',
+                    maxWidth: '100%',
+                  }}
+                >
                   {conn.endpoint}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${
-                    conn.is_active ? 'bg-green-400' : 'bg-slate-300'
-                  }`} />
-                  <span className={`text-xs font-medium ${
-                    conn.is_active ? 'text-green-600' : 'text-slate-400'
-                  }`}>
-                    {conn.is_active ? 'Connected' : 'Disconnected'}
-                  </span>
-                  {conn.retry_count > 0 && (
-                    <span className="text-xs text-red-400">
-                      ({conn.retry_count} failed)
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-slate-400">
+
+                {/* Status */}
+                <StatusBadge active={conn.is_active} />
+
+                {/* Created */}
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>
                   {new Date(conn.created_at).toLocaleDateString()}
                 </span>
-                <div className="flex items-center gap-2">
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5">
                   {conn.is_active ? (
                     <button
                       disabled={loadingId === conn.id}
                       onClick={() => handleDisconnect(conn.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                                 border border-slate-200 text-slate-600 hover:bg-slate-100
-                                 disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      style={{
+                        padding: '5px 11px',
+                        borderRadius: '7px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        border: '1px solid #E2E8F0',
+                        background: '#fff',
+                        color: '#475569',
+                        cursor: 'pointer',
+                      }}
                     >
                       {loadingId === conn.id
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -221,9 +412,17 @@ export default function ConnectionsPage() {
                     <button
                       disabled={loadingId === conn.id}
                       onClick={() => handleConnect(conn.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                                 border border-indigo-200 text-indigo-600 hover:bg-indigo-50
-                                 disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      style={{
+                        padding: '5px 11px',
+                        borderRadius: '7px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        border: '1px solid #6366F1',
+                        background: '#6366F1',
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
                     >
                       {loadingId === conn.id
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -232,29 +431,60 @@ export default function ConnectionsPage() {
                       Connect
                     </button>
                   )}
+
                   <button
                     onClick={() => handleDelete(conn.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-500
-                               hover:bg-red-50 transition-colors"
+                    className="transition-colors"
+                    style={{
+                      width: '30px', height: '30px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: '7px',
+                      border: '1px solid #E2E8F0',
+                      background: '#fff',
+                      color: '#CBD5E1',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLButtonElement).style.color = '#DC2626'
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#FECACA'
+                      ;(e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.color = '#CBD5E1'
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#E2E8F0'
+                      ;(e.currentTarget as HTMLButtonElement).style.background = '#fff'
+                    }}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Inline error row */}
+              {/* Error row */}
               {connectionErrors[conn.id] && (
-                <div className="px-5 py-2 bg-red-50 border-b border-red-100
-                                flex items-center gap-2 text-xs text-red-600">
+                <div
+                  className="flex items-center gap-2 px-4 py-2 text-xs"
+                  style={{
+                    background: '#FEF2F2',
+                    borderBottom: '1px solid #FECACA',
+                    color: '#DC2626',
+                  }}
+                >
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {connectionErrors[conn.id]}
                 </div>
               )}
 
-              {/* Last connected info */}
+              {/* Connected since row */}
               {conn.last_connected_at && conn.is_active && (
-                <div className="px-5 py-1.5 bg-green-50 border-b border-green-100
-                                flex items-center gap-2 text-xs text-green-600">
+                <div
+                  className="flex items-center gap-2 px-4 py-1.5 text-xs"
+                  style={{
+                    background: '#F0FDF4',
+                    borderBottom: '1px solid #BBF7D0',
+                    color: '#16A34A',
+                  }}
+                >
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   Connected since {new Date(conn.last_connected_at).toLocaleTimeString()}
                 </div>

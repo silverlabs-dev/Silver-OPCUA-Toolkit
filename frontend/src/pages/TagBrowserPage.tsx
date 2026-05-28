@@ -4,7 +4,10 @@ import { useEffect, useState, useMemo } from 'react'
 import type { Connection, NodeInfo } from '@/lib/api'
 import { connectionsApi, tagsApi, parseNodeId } from '@/lib/api'
 import { useWatchlist } from '@/lib/watchlist'
-import { ChevronRight, ChevronDown, Folder, Tag, Search, X, Loader2, Info, Plus, Check } from 'lucide-react'
+import {
+  ChevronRight, ChevronDown, Folder, Tag,
+  Search, X, Loader2, Plus, Check,
+} from 'lucide-react'
 
 interface TreeNode extends NodeInfo {
   children?: TreeNode[]
@@ -23,18 +26,61 @@ function flattenTree(nodes: TreeNode[], expanded: Record<string, TreeNode[]>): T
   return result
 }
 
+// ── Detail field row ──
+function DetailRow({ label, value, mono = false, accent = false }: {
+  label: string; value: string; mono?: boolean; accent?: boolean
+}) {
+  return (
+    <div
+      className="flex items-start px-4 py-2.5"
+      style={{
+        borderBottom: '1px solid #F1F5F9',
+        background: accent ? '#F5F3FF' : undefined,
+      }}
+    >
+      <span
+        className="shrink-0 pt-0.5"
+        style={{
+          width: '120px',
+          fontSize: '10.5px',
+          fontWeight: 600,
+          color: '#94A3B8',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: accent ? '18px' : '12.5px',
+          color: accent ? '#5B21B6' : '#0F172A',
+          fontWeight: accent ? 700 : 500,
+          fontFamily: mono ? 'ui-monospace, monospace' : undefined,
+          wordBreak: 'break-all',
+          letterSpacing: accent ? '-0.02em' : undefined,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────
+
 export default function TagBrowserPage() {
   const { addTag, removeTag, isWatched } = useWatchlist()
 
-  const [connections, setConnections] = useState<Connection[]>([])
+  const [connections, setConnections]       = useState<Connection[]>([])
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null)
-  const [nodes, setNodes] = useState<TreeNode[]>([])
-  const [expanded, setExpanded] = useState<Record<string, TreeNode[]>>({})
-  const [loadingNodes, setLoadingNodes] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [selectedTag, setSelectedTag] = useState<NodeInfo | null>(null)
+  const [nodes, setNodes]                   = useState<TreeNode[]>([])
+  const [expanded, setExpanded]             = useState<Record<string, TreeNode[]>>({})
+  const [loadingNodes, setLoadingNodes]     = useState<Record<string, boolean>>({})
+  const [loading, setLoading]               = useState(false)
+  const [error, setError]                   = useState('')
+  const [search, setSearch]                 = useState('')
+  const [selectedTag, setSelectedTag]       = useState<NodeInfo | null>(null)
 
   useEffect(() => {
     connectionsApi.list().then(res => setConnections(res.data))
@@ -98,10 +144,9 @@ export default function TagBrowserPage() {
     }
   }
 
-  // Use clean node_id for isWatched check too
   const isNodeWatched = (node: NodeInfo) => isWatched(parseNodeId(node.node_id))
 
-  const allNodes = useMemo(() => flattenTree(nodes, expanded), [nodes, expanded])
+  const allNodes     = useMemo(() => flattenTree(nodes, expanded), [nodes, expanded])
   const filteredNodes = useMemo(() => {
     if (!search) return null
     return allNodes.filter(n => n.name.toLowerCase().includes(search.toLowerCase()))
@@ -109,79 +154,112 @@ export default function TagBrowserPage() {
 
   const activeConnections = connections.filter(c => c.is_active)
 
+  // ── Tree node renderer ──
   const renderNode = (node: TreeNode, depth: number = 0) => {
-    const isObject = node.node_class === 'Object'
-    const isExpanded = !!expanded[node.node_id]
+    const isObject     = node.node_class === 'Object'
+    const isExp        = !!expanded[node.node_id]
     const isNodeLoading = !!loadingNodes[node.node_id]
-    const isSelected = selectedTag?.node_id === node.node_id
-    const watched = isNodeWatched(node)
-    const children = expanded[node.node_id] || []
+    const isSelected   = selectedTag?.node_id === node.node_id
+    const watched      = isNodeWatched(node)
+    const children     = expanded[node.node_id] || []
 
     return (
       <div key={node.node_id}>
         <div
-          className={`
-            flex items-center gap-2 py-1.5 rounded-md text-sm cursor-pointer
-            transition-colors duration-100 group
-            ${isSelected ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-100 text-slate-700'}
-          `}
-          style={{ paddingLeft: `${depth * 16 + 8}px`, paddingRight: '8px' }}
+          className="flex items-center gap-1.5 rounded-md cursor-pointer group"
+          style={{
+            paddingTop: '5px',
+            paddingBottom: '5px',
+            paddingLeft: `${depth * 14 + 8}px`,
+            paddingRight: '6px',
+            fontSize: '12.5px',
+            color: isSelected ? '#5B21B6' : '#475569',
+            background: isSelected ? '#F5F3FF' : undefined,
+            transition: 'background 0.1s',
+          }}
+          onMouseEnter={e => {
+            if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC'
+          }}
+          onMouseLeave={e => {
+            if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = ''
+          }}
           onClick={() => isObject ? handleToggleExpand(node) : handleSelectTag(node)}
         >
-          {/* Expand chevron */}
-          <span className="w-4 shrink-0">
+          {/* Chevron */}
+          <span className="w-3.5 shrink-0 flex items-center justify-center">
             {isObject && (
               isNodeLoading
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                : isExpanded
-                  ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                  : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                ? <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#94A3B8' }} />
+                : isExp
+                  ? <ChevronDown className="w-3 h-3" style={{ color: '#94A3B8' }} />
+                  : <ChevronRight className="w-3 h-3" style={{ color: '#94A3B8' }} />
             )}
           </span>
 
           {/* Icon */}
           {isObject
-            ? <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-            : <Tag className="w-4 h-4 text-indigo-400 shrink-0" />
+            ? <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: '#F59E0B' }} />
+            : <Tag    className="w-3.5 h-3.5 shrink-0" style={{ color: '#6366F1' }} />
           }
 
           {/* Name */}
-          <span className={`flex-1 truncate ${isObject ? 'font-medium text-slate-800' : ''}`}>
+          <span
+            className="flex-1 truncate"
+            style={{ fontWeight: isObject ? 600 : 400, color: isObject ? '#0F172A' : undefined }}
+          >
             {node.name}
           </span>
 
-          {/* Value */}
+          {/* Live value chip */}
           {node.value !== null && node.node_class === 'Variable' && (
-            <span className={`
-              font-mono text-xs px-1.5 py-0.5 rounded
-              ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}
-            `}>
+            <span
+              className="font-mono shrink-0"
+              style={{
+                fontSize: '11px',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                background: isSelected ? '#EDE9FE' : '#F1F5F9',
+                color: isSelected ? '#6D28D9' : '#64748B',
+              }}
+            >
               {node.value}
             </span>
           )}
 
-          {/* Add to watchlist button */}
+          {/* Watch toggle */}
           {node.node_class === 'Variable' && (
             <button
               onClick={e => { e.stopPropagation(); handleToggleWatch(node) }}
               title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
-              className={`
-                ml-1 p-0.5 rounded transition-colors shrink-0
-                ${watched
-                  ? 'text-indigo-500 hover:text-red-400'
-                  : 'text-slate-300 hover:text-indigo-500 opacity-0 group-hover:opacity-100'
+              className="shrink-0 transition-colors"
+              style={{
+                padding: '2px',
+                borderRadius: '4px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: watched ? '#6366F1' : '#CBD5E1',
+                opacity: watched ? 1 : 0,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.opacity = '1'
+                if (!watched) (e.currentTarget as HTMLButtonElement).style.color = '#6366F1'
+              }}
+              onMouseLeave={e => {
+                if (!watched) {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = '0'
+                  ;(e.currentTarget as HTMLButtonElement).style.color = '#CBD5E1'
                 }
-              `}
+              }}
             >
               {watched
                 ? <Check className="w-3.5 h-3.5" />
-                : <Plus className="w-3.5 h-3.5" />
+                : <Plus  className="w-3.5 h-3.5" />
               }
             </button>
           )}
         </div>
-
-        {isExpanded && children.map(child => renderNode(child, depth + 1))}
+        {isExp && children.map(child => renderNode(child, depth + 1))}
       </div>
     )
   }
@@ -190,7 +268,7 @@ export default function TagBrowserPage() {
     if (!filteredNodes) return null
     if (filteredNodes.length === 0) {
       return (
-        <div className="py-8 text-center text-slate-400 text-sm">
+        <div className="py-8 text-center" style={{ fontSize: '12px', color: '#94A3B8' }}>
           No tags matching "{search}"
         </div>
       )
@@ -198,58 +276,100 @@ export default function TagBrowserPage() {
     return filteredNodes.map(node => renderNode(node, 0))
   }
 
+  // ── Layout ──────────────────────────────────────────
+
   return (
-    <div className="flex h-[calc(100vh-56px)]" style={{ backgroundColor: '#f5f7fa' }}>
+    <div className="flex" style={{ height: 'calc(100vh - 0px)', background: '#F1F5F9' }}>
 
-      {/* Left panel — tree */}
-      <div className="flex flex-col w-80 border-r bg-white shrink-0">
-
+      {/* ── Left: tree panel ── */}
+      <div
+        className="flex flex-col shrink-0"
+        style={{
+          width: '288px',
+          background: '#fff',
+          borderRight: '1px solid #E2E8F0',
+        }}
+      >
         {/* Connection selector */}
-        <div className="p-3 border-b">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+        <div style={{ padding: '12px', borderBottom: '1px solid #E2E8F0' }}>
+          <div
+            style={{
+              fontSize: '9.5px', fontWeight: 600, color: '#94A3B8',
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              marginBottom: '8px',
+            }}
+          >
             Connection
-          </p>
+          </div>
+
           {activeConnections.length === 0 ? (
-            <p className="text-xs text-slate-400">No active connections.</p>
+            <p style={{ fontSize: '12px', color: '#94A3B8' }}>No active connections.</p>
           ) : (
             <div className="flex flex-col gap-1">
-              {activeConnections.map(conn => (
-                <button
-                  key={conn.id}
-                  onClick={() => handleSelectConnection(conn)}
-                  className={`
-                    flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium
-                    transition-colors text-left
-                    ${selectedConnection?.id === conn.id
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-600 hover:bg-slate-100'
-                    }
-                  `}
-                >
-                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                  {conn.name}
-                </button>
-              ))}
+              {activeConnections.map(conn => {
+                const isSelected = selectedConnection?.id === conn.id
+                return (
+                  <button
+                    key={conn.id}
+                    onClick={() => handleSelectConnection(conn)}
+                    className="flex items-center gap-2 text-left transition-colors"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '7px',
+                      fontSize: '12.5px',
+                      fontWeight: 500,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isSelected ? '#EEF2FF' : 'transparent',
+                      color: isSelected ? '#6366F1' : '#475569',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '7px', height: '7px', borderRadius: '50%',
+                        background: '#22C55E', flexShrink: 0, display: 'inline-block',
+                      }}
+                    />
+                    {conn.name}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
 
         {/* Search */}
         {nodes.length > 0 && (
-          <div className="p-3 border-b">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid #E2E8F0' }}>
+            <div
+              className="flex items-center gap-2"
+              style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '7px',
+                padding: '6px 10px',
+                transition: 'border-color 0.15s',
+              }}
+            >
+              <Search style={{ width: '13px', height: '13px', color: '#94A3B8', flexShrink: 0 }} />
               <input
                 type="text"
                 placeholder="Search tags..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-8 pr-8 py-1.5 text-sm border rounded-md bg-slate-50
-                           focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  fontSize: '12.5px',
+                  color: '#0F172A',
+                  minWidth: 0,
+                }}
               />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                  <X className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600" />
+                <button onClick={() => setSearch('')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                  <X style={{ width: '13px', height: '13px', color: '#94A3B8' }} />
                 </button>
               )}
             </div>
@@ -257,88 +377,115 @@ export default function TagBrowserPage() {
         )}
 
         {/* Tree */}
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto" style={{ padding: '6px 8px' }}>
           {loading && (
-            <div className="flex items-center gap-2 py-4 px-2 text-sm text-slate-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="flex items-center gap-2 py-4 px-1" style={{ fontSize: '12px', color: '#94A3B8' }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Loading nodes...
             </div>
           )}
-          {error && <p className="text-xs text-red-500 px-2 py-2">{error}</p>}
+          {error && (
+            <p style={{ fontSize: '12px', color: '#DC2626', padding: '8px 4px' }}>{error}</p>
+          )}
           {!loading && !error && nodes.length === 0 && selectedConnection && (
-            <p className="text-xs text-slate-400 px-2 py-4">No nodes found.</p>
+            <p style={{ fontSize: '12px', color: '#94A3B8', padding: '12px 4px' }}>
+              No nodes found.
+            </p>
           )}
           {!loading && !selectedConnection && (
-            <p className="text-xs text-slate-400 px-2 py-4">Select a connection to browse tags.</p>
+            <p style={{ fontSize: '12px', color: '#94A3B8', padding: '12px 4px' }}>
+              Select a connection to browse tags.
+            </p>
           )}
           {search ? renderSearchResults() : nodes.map(node => renderNode(node, 0))}
         </div>
       </div>
 
-      {/* Right panel — tag details */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* ── Right: details panel ── */}
+      <div className="flex-1 overflow-y-auto" style={{ padding: '24px' }}>
         {selectedTag ? (
-          <div className="max-w-lg">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Tag className="w-5 h-5 text-indigo-500" />
-                <h2 className="text-lg font-semibold text-slate-800">{selectedTag.name}</h2>
+          <div style={{ maxWidth: '520px' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div
+                  style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    background: '#EEF2FF', border: '1px solid #C7D2FE',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Tag style={{ width: '15px', height: '15px', color: '#6366F1' }} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                    {selectedTag.name}
+                  </h2>
+                  <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '1px' }}>
+                    {selectedTag.node_class}
+                  </p>
+                </div>
               </div>
 
-              {/* Add/Remove watchlist button in details panel */}
+              {/* Watch button */}
               <button
                 onClick={() => handleToggleWatch(selectedTag)}
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                  transition-colors border
-                  ${isNodeWatched(selectedTag)
-                    ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200'
-                  }
-                `}
+                className="flex items-center gap-1.5 transition-colors"
+                style={{
+                  padding: '7px 13px',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  ...(isNodeWatched(selectedTag)
+                    ? { background: '#EEF2FF', color: '#6366F1', borderColor: '#C7D2FE' }
+                    : { background: '#fff', color: '#475569', borderColor: '#E2E8F0' }
+                  ),
+                }}
               >
                 {isNodeWatched(selectedTag)
                   ? <><Check className="w-3.5 h-3.5" /> In Watchlist</>
-                  : <><Plus className="w-3.5 h-3.5" /> Add to Watchlist</>
+                  : <><Plus  className="w-3.5 h-3.5" /> Add to Watchlist</>
                 }
               </button>
             </div>
 
-            <div className="bg-white border rounded-xl overflow-hidden">
-              {[
-                { label: 'Name',          value: selectedTag.name },
-                { label: 'Node ID',       value: parseNodeId(selectedTag.node_id), mono: true },
-                { label: 'Node Class',    value: selectedTag.node_class },
-                { label: 'Current Value', value: selectedTag.value ?? '—', mono: true, highlight: true },
-              ].map(row => (
-                <div
-                  key={row.label}
-                  className={`flex items-start px-4 py-3 border-b last:border-0 ${row.highlight ? 'bg-indigo-50' : ''}`}
-                >
-                  <span className="w-36 text-xs font-medium text-slate-400 uppercase tracking-wide pt-0.5 shrink-0">
-                    {row.label}
-                  </span>
-                  <span className={`text-sm text-slate-800 break-all
-                    ${row.mono ? 'font-mono' : ''}
-                    ${row.highlight ? 'text-indigo-700 font-semibold text-base' : ''}
-                  `}>
-                    {row.value}
-                  </span>
-                </div>
-              ))}
+            {/* Details card */}
+            <div className="card overflow-hidden">
+              <div style={{ borderBottom: '1px solid #E2E8F0', padding: '10px 16px', background: '#F8FAFC' }}>
+                <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Tag Details
+                </span>
+              </div>
+              <DetailRow label="Name"          value={selectedTag.name} />
+              <DetailRow label="Node ID"       value={parseNodeId(selectedTag.node_id)} mono />
+              <DetailRow label="Node Class"    value={selectedTag.node_class} />
+              <DetailRow label="Current Value" value={String(selectedTag.value ?? '—')} mono accent />
             </div>
 
-            <p className="text-xs text-slate-400 mt-4 flex items-center gap-1">
-              <Info className="w-3.5 h-3.5" />
+            <p style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '12px' }}>
               Click another tag to inspect it, or click the same tag to deselect.
             </p>
           </div>
         ) : (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
-              <Tag className="w-10 h-10 mx-auto text-slate-200 mb-3" />
-              <p className="text-slate-400 font-medium text-sm">No tag selected</p>
-              <p className="text-slate-300 text-xs mt-1">
+              <div
+                style={{
+                  width: '48px', height: '48px', borderRadius: '12px',
+                  background: '#F8FAFC', border: '1px solid #E2E8F0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 12px',
+                }}
+              >
+                <Tag style={{ width: '20px', height: '20px', color: '#CBD5E1' }} />
+              </div>
+              <p style={{ fontSize: '13.5px', fontWeight: 600, color: '#475569' }}>
+                No tag selected
+              </p>
+              <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>
                 Click on a Variable tag in the tree to inspect it
               </p>
             </div>

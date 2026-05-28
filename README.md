@@ -1,5 +1,5 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
-![Release](https://img.shields.io/badge/release-v0.2.0--alpha-blue)
+![Release](https://img.shields.io/badge/release-v0.3.0--alpha-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 # Silver OPC UA Toolkit
@@ -55,7 +55,7 @@ Silver OPC UA Toolkit aims to provide a modern alternative with:
 - OPC UA Connection Manager
 - Scalable Tag Browser
 - Searchable OPC UA Navigation
-- Watchlist-based monitoring workflow
+- Watchlist-based monitoring workflow (persistent via localStorage)
 - Realtime OPC UA Monitoring
 - WebSocket-based realtime updates
 - Realtime Charts
@@ -63,9 +63,14 @@ Silver OPC UA Toolkit aims to provide a modern alternative with:
 - Configurable update intervals
 - Chart pause / resume
 - Boolean tag visualization (ON/OFF)
+- CSV data export with time-window selection
+- Alarm and threshold visualization (Warning / Critical, High / Low)
+- Threshold reference lines on trend charts
+- System Status panel with live runtime indicators
+- Realistic 5-mode industrial simulator (normal / alarm / step / frozen / recovering)
 - Structured logging
 - Dockerized deployment
-- Industrial simulator environment
+- Modern sidebar navigation with industrial SaaS aesthetic
 
 ---
 
@@ -227,12 +232,13 @@ Realtime industrial monitoring dashboard with watchlists, configurable update ra
 
 ## Near-Term
 
-- Persistent watchlists
-- CSV export
-- Alarm visualization
-- Enhanced tag filtering
-- Multi-connection monitoring
-- Improved industrial UX workflows
+- ✅ Persistent watchlists
+- ✅ CSV export
+- ✅ Alarm visualization
+- ✅ System Status panel
+- ✅ Improved industrial UX workflows
+- OPC UA security foundations (v0.4.0-alpha)
+- Multi-connection monitoring (v0.5.0-beta)
 
 ## Mid-Term
 
@@ -254,7 +260,7 @@ Realtime industrial monitoring dashboard with watchlists, configurable update ra
 
 # Project Status
 
-Current status: **v0.2.0-alpha**
+Current status: **v0.3.0-alpha**
 
 The project is under active development and currently focused on building a modern industrial monitoring platform around OPC UA and future industrial AI workflows.
 
@@ -263,6 +269,7 @@ Current alpha focus areas:
 - Realtime industrial monitoring
 - Modern industrial UX
 - Scalable OPC UA workflows
+- Alarm and threshold visualization
 - Lightweight deployment
 - Open-source industrial tooling
 

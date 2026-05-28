@@ -8,6 +8,61 @@ Pre-release versions may contain breaking changes during active alpha developmen
 
 ---
 
+## [v0.3.0-alpha] - 2026-05-29
+
+### Added
+
+#### Frontend
+- Persistent watchlist via `localStorage` (`silver_opcua_watchlist`)
+- CSV export dialog with time-window slider and per-tag columns
+- Alarm and threshold visualization:
+  - Warning High / Warning Low per tag
+  - Critical High / Critical Low per tag
+  - Threshold lines on trend chart (dashed reference lines)
+  - Card color states: normal / warning / critical
+  - Threshold settings persisted to `localStorage` (`silver_opcua_thresholds`)
+- System Status panel in sidebar with real-time indicators:
+  - Backend API availability
+  - WebSocket connection state
+  - OPC UA connection state
+  - Stream running / paused / stopped
+  - Active watchlist tag count
+- Auto-restart stream when watchlist changes during active monitoring
+- Stream settings persisted to `localStorage` (`silver_opcua_stream_settings`)
+- UI Refinement Pass:
+  - Sidebar navigation replacing top navbar
+  - Improved visual hierarchy and surface depth
+  - Refined card, badge, and table styling
+  - Industrial SaaS aesthetic (Cognite / Grafana inspired)
+  - Cleaner typography scale and spacing
+  - Polished Tag Browser tree and details panel
+  - Dark tooltip style for charts
+  - Smoother hover and transition states
+
+#### Simulator
+- Realistic 5-mode industrial signal simulation:
+  - `normal` — Gaussian noise around setpoint
+  - `alarm` — values exceeding thresholds
+  - `step` — sudden setpoint changes
+  - `frozen` — stuck/bad-quality signal
+  - `recovering` — gradual return to normal
+
+---
+
+### Fixed
+- Watchlist tags removed correctly when parent connection is deleted
+- Stream correctly stops when all watchlist tags are cleared
+- WebSocket status accurately reflects live connection state
+
+---
+
+### Changed
+- Navigation migrated from horizontal top bar to vertical sidebar
+- System Status footer replaced static text with live runtime indicators
+- Monitoring cards now reflect alarm state via border and background color
+
+---
+
 ## [v0.2.0-alpha] - 2026-05-24
 
 ### Added
@@ -142,14 +197,13 @@ This is the first public alpha release intended for early feedback and industria
 
 ## Roadmap
 
-### v0.3.0-alpha
+### v0.3.0-alpha ✅ Released 2026-05-29
 - Persistent watchlist (`localStorage`)
 - CSV export for chart data
 - Alarm / threshold visualization
-- Simulator improvements:
-  - noisy signals
-  - step changes
-  - bad quality states
+- System Status panel
+- UI Refinement Pass
+- Realistic 5-mode industrial simulator
 
 ### v0.4.0-alpha
 - OPC UA security foundations
